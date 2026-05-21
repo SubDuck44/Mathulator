@@ -1,3 +1,4 @@
+// Feature test macros
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #endif
@@ -6,120 +7,190 @@
 #define _DEFAULT_SOURCE
 #endif
 
+// Stdlibs
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+// Project components
 #include "utils.c"
 
+// Stores recognized variable identifiers and their definition in string form
 typedef struct {
 	char*  key;
 	size_t key_len;
 	char*  val;
 	size_t val_len;
-} Node;
-DynArr(Node);
+} Symbol;
 
-void ask_value(Node* symbol);
+Array(Symbol);
+
+/* Working storage of all symbols. Functions as a definition tree which holds
+   the expansion of all variables. Is used for Step 1 - 3 of recursive
+   evaluation. */
+Symbols symbols = {0};
+
+/* Splits an input string from the user into tokens and recursively prompts to
+   define them -> Step 1 of rescursive evaluation */
+void parse_string(const char* target, size_t len);
+
+/* Packs a symbol identifier into a "Symbol" and calls ask_for_definition() to
+   fill out the definition. -> Step 2 of recursive evaluation */
 void store_symbol(const char* target, size_t len);
-void parse_string(const char* target, ssize_t len);
 
-Nodes symbols = {0};
+/* Asks the user to define a certain symbol; stores response in value of symbol,
+   then calls parse_string() to evaluate the given input string for further
+   valid symbol identifiers. If none are found, the recursion breaks and the
+   tree of symbols is deemed complete. -> Step 3 of recursive evaluation */
+void ask_for_definition(Symbol* target);
 
-char* keywords[] = {"sqrt", "pow",  "log",  "sin",  "cos",  "tan",
-                    "cot",  "asin", "acos", "atan", "acot", "pi"};
+/* List of identifiers that should not be interpreted as variable names */
+char* id_blacklist[] = {"sqrt", "pow",  "log",  "sin",  "cos",  "tan",
+                        "cot",  "asin", "acos", "atan", "acot", "pi"};
+//------------------------------------------------------------------------------
+//
+// IMPLEMENTATION --------------------------------------------------------------
+//
+//______________________________________________________________________________
 
-void ask_value(Node* symbol) {
-	char*   buf = NULL;
-	size_t  cap = 0;
-	ssize_t len = 0;
-
-	fprintf(stderr, "Define %.*s ⭢  ", (int) symbol->key_len, symbol->key);
-	len = getline(&buf, &cap, stdin);
-	if(len <= 0) {
-		fputs("\n", stderr);
-		err(1, "Failed to read line");
-		return;
-	}
-	symbol->val     = buf;
-	symbol->val_len = len;
-	parse_string(symbol->val, symbol->val_len);
-}
-
-void store_symbol(const char* target, size_t len) {
-	// Ignore if keyword
-	for(size_t iter = 0; iter < sizeof(keywords) / sizeof(char*); iter++) {
-		if(strlen(keywords[iter]) != len) continue;
-		if(!strncmp(keywords[iter], target, len)) {
-			fprintf(
-				stderr, "Ignored string %.*s due to match with keyword\n",
-				(int) len, target
-			);
-			return;
-		}
-	}
-
-	// Ignore if duplicate
-	for(size_t iter = 0; iter < symbols.len; iter++) {
-		if(!strncmp(symbols.arr[iter].key, target, len)) {
-			fprintf(
-				stderr, "Ignored string %.*s due to match with duplicate\n",
-				(int) len, target
-			);
-			return;
-		}
-	}
-
-	// Add new symbol to table
-	Node new_symbol = {strndup(target, len), len, NULL, 0};
-	ask_value(&new_symbol);
-	DynArrPush(&symbols, new_symbol);
-	fprintf(
-		stderr, "Added symbol %.*s at index %ld\n", (int) len, target,
-		symbols.len - 1
-	);
-}
-
-void parse_string(const char* target, ssize_t len) {
+void parse_string(const char* target, size_t len) {
 	size_t match_start = 0;
 	size_t match_end   = 0;
-	bool   in_match    = false;
 
-	// Search for matchable characters
-	for(ssize_t iter = 0; iter <= len; iter++) {
+	bool in_match = false;
+
+	// Scan for valid variable identifiers in target string
+	for(size_t iter = 0; iter <= len; iter++) {
+
 		char c = target[iter];
-		if((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95) {
-			fprintf(stderr, "Found matchable char %c at %lu\n", c, iter);
-			// Extend the match if character is matchable
+
+		if((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_') {
+
+			// Set start of match here if not already in match
 			if(!in_match) {
 				match_start = iter;
 				in_match    = true;
 			}
+
+			// Extend the match if already in match
 			match_end = iter;
+
 		} else if(in_match) {
+
 			fprintf(
 				stderr, "Terminated match %.*s with %c\n",
 				(int) (match_end - match_start + 1), &target[match_start], c
 			);
+
 			/* End and store match if previously in match and current
 			   character not matchable */
 			store_symbol(&target[match_start], match_end - match_start + 1);
+
 			in_match = false;
 		}
 	}
 }
 
-int main(void) {
-	char*  buf = NULL;
-	size_t cap = 0;
+void store_symbol(const char* target, size_t target_len) {
 
+	// Skip target identifier if it's blacklisted
+	size_t num_blacklisted_ids = sizeof(id_blacklist) / sizeof(id_blacklist[0]);
+
+	for(size_t iter = 0; iter < num_blacklisted_ids; iter++) {
+
+		// Avoid matching shorter substrings of keywords
+		if(strlen(id_blacklist[iter]) != target_len) continue;
+
+		if(!strncmp(id_blacklist[iter], target, target_len)) {
+
+			fprintf(
+				stderr, "Ignored blacklisted identifier %.*s\n",
+				(int) target_len, target
+			);
+
+			return;
+		}
+	}
+
+	// Skip target identifier if a duplicate is already present in symbol tree
+	for(size_t iter = 0; iter < symbols.len; iter++) {
+
+		if(!strncmp(symbols.ptr[iter].key, target, target_len)) {
+
+			fprintf(
+				stderr, "Ignored string %.*s due to match with duplicate\n",
+				(int) target_len, target
+			);
+
+			return;
+		}
+	}
+
+	// Found valid new identifier
+	Symbol new_symbol = {strndup(target, target_len), target_len, NULL, 0};
+
+	// Fill in missing definition
+	ask_for_definition(&new_symbol); // RECURSION here
+
+	// Push finished symbol
+	ArrayAdd(symbols, new_symbol);
+}
+
+void ask_for_definition(Symbol* symbol) {
+
+	char*   buf = NULL; // String buffer, allocated by getline
+	size_t  cap = 0;
+	ssize_t len = 0;
+
+	// Prompt user
+	fprintf(stderr, "Define %.*s ⭢  ", (int) symbol->key_len, symbol->key);
+	len = getline(&buf, &cap, stdin);
+
+	// CONTINUE if received input
+
+	if(len <= 0) {
+		fputs("\n", stderr); // Hack to avoid jumbling the error message
+		err(1, "Failed to read line");
+
+		return;
+	}
+
+	// Store user definition
+	symbol->val     = buf;
+	symbol->val_len = (size_t) len;
+
+	// Scan for further valid symbol identifiers in definition
+	parse_string(symbol->val, symbol->val_len); // RECURSION here
+}
+
+//------------------------------------------------------------------------------
+//
+// ENTRY POINT
+//
+//______________________________________________________________________________
+
+int main(void) {
+
+	// getline() buffer
+	char*   buf = NULL;
+	size_t  cap = 0;
+	ssize_t len = 0;
+
+	// User prompt
 	fputs("Mathulator ⭢  ", stderr);
-	ssize_t len = getline(&buf, &cap, stdin);
+
+	// Wait for input
+	len = getline(&buf, &cap, stdin);
+
+	// CONTINUE if received input
+
 	if(len <= 0) {
 		fputs("\n", stderr);
 		err(1, "Failed to read line");
 	}
-	buf[len - 1] = 0;
-	parse_string(buf, len);
+
+	buf[len - 1] = 0; // Clear newline
+
+	parse_string(buf, (size_t) len); // Enter recursive evaluation phase
 }

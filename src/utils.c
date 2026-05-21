@@ -1,89 +1,72 @@
 #pragma once
 
+// Feature test macro
 #ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE
 #endif
 
 // Dynamic arrays
-#define DEFAULT_DYNARR_CAP 16
-
-#define DynArrN(type, name)                                                    \
+#define ArrayN(t, n)                                                           \
 	typedef struct {                                                           \
-		type*  arr;                                                            \
+		t*     ptr;                                                            \
 		size_t len;                                                            \
 		size_t cap;                                                            \
-	} name
+	} n
 
-#define DynArr(type) DynArrN(type, type##s)
+#define Array(t) ArrayN(t, t##s)
 
-#define DynArrExtend(array, num)                                               \
+/* Adds an element to a dynamic array, enlarging its capacity if needed. If
+   capacity is zero, it will allocate memory for 16 elements into ptr. */
+#define ArrayAdd(arr, x)                                                       \
 	do {                                                                       \
-		(array)->len += num;                                                   \
-		while((array)->cap < (array)->len) {                                   \
-			(array)->cap = MAX((array)->cap << 1, DEFAULT_DYNARR_CAP);         \
-		}                                                                      \
-		(array)->arr =                                                         \
-			reallocarray((array)->arr, (array)->cap, sizeof((array)->arr[0])); \
-		if(!((array)->arr)) {                                                  \
-			fputs("\nERR: Allocation fucked, try again", stderr);              \
-		}                                                                      \
+		if((arr).len >= (arr).cap)                                             \
+			(arr).ptr = reallocarray(                                          \
+				(arr).ptr, ((arr).cap = (arr).cap ? (arr).cap << 1 : 16),      \
+				sizeof((arr).ptr[0])                                           \
+			);                                                                 \
+                                                                               \
+		(arr).ptr[(arr).len++] = (x);                                          \
 	} while(0)
 
-#define DynArrShrink(array, num)                                               \
-	do {                                                                       \
-		(array)->len -= num;                                                   \
-		while((array)->cap >> 1 >= (array)->len) {                             \
-			(array)->cap = (array)->cap >> 1;                                  \
-		}                                                                      \
-		(array)->arr =                                                         \
-			reallocarray((array)->arr, (array)->cap, sizeof((array)->arr[0])); \
-		if(!((array)->arr)) {                                                  \
-			fputs("\nERR: Allocation fucked, try again", stderr);              \
-		}                                                                      \
-	} while(0)
+/* Inserts some code into a simple for loop of a dynamic array while providing
+   the current element directly via an iterator "it" */
+#define ArrayLoop(arr, body) ArrayLoopN(arr, it, body)
 
-#define DynArrPush(array, data)                                                \
-	do {                                                                       \
-		DynArrExtend(array, 1);                                                \
-		(array)->arr[(array)->len - 1] = data;                                 \
-	} while(0)
+/* Same as ArrayLoop but with a named iterator */
+#define ArrayLoopN(arr, it, body)                                              \
+	for(size_t i = 0; i < (arr).len; i++) {                                    \
+		typeof((arr).ptr[0])* it = &(arr).ptr[i];                              \
+		body                                                                   \
+	}
 
-#define DynArrPop(array) DynArrShrink(array, 1);
-
-#define DynArrInsert(array, index, src)                                        \
-	do {                                                                       \
-		if(index > (array)->len - 1) {                                         \
-			(array)->arr[(array)->len - 1] = *src;                             \
-		} else {                                                               \
-			for(size_t i = (array)->len; i > index; i--) {                     \
-				(array)->arr[i] = (array)->arr[i - 1];                         \
-			}                                                                  \
-			(array)->arr[index] = *src;                                        \
+/* Loops through an array with a named iterator like ArrayLoopN. Terminates if
+   an expression "pred" is true at any iteration and stores the element
+   corresponding to that iteration in "result". */
+#define ArrayFindN(arr, result, it, pred)                                      \
+	typeof((arr).ptr[0])* result = NULL;                                       \
+	ArrayLoopN(arr, it, {                                                      \
+		if(pred) {                                                             \
+			result = it;                                                       \
+			break;                                                             \
 		}                                                                      \
-	} while(0)
+	})
 
-#define DynArrRemove(array, index)                                             \
-	do {                                                                       \
-		if(index > (array)->len) {                                             \
-			fputs("\nERR: Try providing an actual index next time", stderr);   \
-		} else {                                                               \
-			if(index != (array)->len - 1) {                                    \
-				for(size_t j = 0; j < (array)->len - 2; j++) {                 \
-					(array)->arr[j] = (array)->arr[j + 1];                     \
-				}                                                              \
-			}                                                                  \
-			DynArrPop(array);                                                  \
-		}                                                                      \
-	} while(0)
+/* Identital to ArrayFindN but without a named iterator */
+#define ArrayFind(arr, result, pred) ArrayFindN(arr, result, it, pred)
 
-#define DynArrLoop(array, body)                                                \
+#define ArrayLast(arr) (arr).ptr[(arr).len - 1]
+
+#define ArrayFree(arr)                                                         \
 	do {                                                                       \
-		for(size_t i = 0; i < (array)->len; i++) {                             \
-			body                                                               \
-		}                                                                      \
+		free((arr).ptr);                                                       \
+		(arr).ptr = NULL;                                                      \
+		(arr).len = (arr).cap = 0;                                             \
 	} while(0)
 
 // Misc
+
 #define MIN(a, b) ((a) < (b)) ? a : b
+
 #define MAX(a, b) ((a) > (b)) ? a : b
+
 #define CLAMP(min, max, val) MIN(MAX((min), (val)), (max))
