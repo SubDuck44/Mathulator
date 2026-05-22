@@ -1,7 +1,5 @@
 #pragma once
 
-
-// Dynamic arrays
 #define ArrayN(t, n)                                                           \
 	typedef struct {                                                           \
 		t*     ptr;                                                            \
