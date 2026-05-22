@@ -1,9 +1,5 @@
 #pragma once
 
-// Feature test macro
-#ifndef _DEFAULT_SOURCE
-#define _DEFAULT_SOURCE
-#endif
 
 // Dynamic arrays
 #define ArrayN(t, n)                                                           \
