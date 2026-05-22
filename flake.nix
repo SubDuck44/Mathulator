@@ -44,6 +44,7 @@
             clang-tools
             just
             valgrind
+            gdb
           ];
         };
       });

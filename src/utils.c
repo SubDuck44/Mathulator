@@ -1,5 +1,18 @@
 #pragma once
 
+#include <err.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+////////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+	char*  str;
+	size_t len;
+} StringView;
+
+////////////////////////////////////////////////////////////////////////////////
+
 #define ArrayN(t, n)                                                           \
 	typedef struct {                                                           \
 		t*     ptr;                                                            \
@@ -22,11 +35,11 @@
 		(arr).ptr[(arr).len++] = (x);                                          \
 	} while(0)
 
-/* Inserts some code into a simple for loop of a dynamic array while providing
-   the current element directly via an iterator "it" */
+/* Runs code 'body' for each element in the dynamic array while providing a
+   pointer to the current element as an iterator 'it' */
 #define ArrayLoop(arr, body) ArrayLoopN(arr, it, body)
 
-/* Same as ArrayLoop but with a named iterator */
+/* Same as ArrayLoop but with a custom iterator */
 #define ArrayLoopN(arr, it, body)                                              \
 	for(size_t i = 0; i < (arr).len; i++) {                                    \
 		typeof((arr).ptr[0])* it = &(arr).ptr[i];                              \
@@ -57,10 +70,41 @@
 		(arr).len = (arr).cap = 0;                                             \
 	} while(0)
 
-// Misc
+////////////////////////////////////////////////////////////////////////////////
 
 #define MIN(a, b) ((a) < (b)) ? a : b
 
 #define MAX(a, b) ((a) > (b)) ? a : b
 
 #define CLAMP(min, max, val) MIN(MAX((min), (val)), (max))
+
+////////////////////////////////////////////////////////////////////////////////
+
+ArrayN(char, UserInput);
+
+// Halts thread and stores next user input in 'result' of type 'UserInput'
+void get_user_input(UserInput* result);
+
+#if __INCLUDE_LEVEL__ == 0 /////////////////////////////////////////////////////
+
+void get_user_input(UserInput* result) {
+	result->ptr = NULL;
+	result->cap = 0;
+
+	// Signed to retain error value
+	ssize_t local_len = getline(&result->ptr, &result->cap, stdin);
+
+	if(local_len <= 0) {
+		fputs(
+			"\n", // Hack to avoid jumping the error message
+			stderr
+		);
+
+		err(1, "Failed to read line");
+	}
+
+	// Signed value converted to standard size_t
+	result->len = (size_t) local_len;
+}
+
+#endif

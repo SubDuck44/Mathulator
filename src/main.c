@@ -4,33 +4,20 @@
 
 #include "evaluate.c"
 
-//------------------------------------------------------------------------------
-//
-// ENTRY POINT
-//
-//______________________________________________________________________________
-
 int main(void) {
+	// Init symbol tree
+	Symbol root = {0};
+	ArrayAdd(symbols, root);
 
-	// getline() buffer
-	char*   buf = NULL;
-	size_t  cap = 0;
-	ssize_t len = 0;
-
-	// User prompt
-	fputs("Mathulator ⭢  ", stderr);
-
-	// Wait for input
-	len = getline(&buf, &cap, stdin);
+	fputs("Mathulator\n➔  ", stderr);
+	UserInput input = {0};
+	get_user_input(&input);
 
 	// CONTINUE if received input
 
-	if(len <= 0) {
-		fputs("\n", stderr);
-		err(1, "Failed to read line");
-	}
+	input.ptr[input.len - 1] = 0; // Clear newline
 
-	buf[len - 1] = 0; // Clear newline
-
-	parse_string(buf, (size_t) len); // Enter recursive evaluation phase
+	parse_string(
+		input.ptr, (size_t) input.len, TREE_ROOT
+	); // Enter recursive evaluation phase
 }

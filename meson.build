@@ -12,6 +12,7 @@ executable(
 	'mathulator',
 	'src/evaluate.c',
 	'src/main.c',
+	'src/tree.c',
 	'src/utils.c',
 	c_args: [
 		'-D_DEFAULT_SOURCE',
