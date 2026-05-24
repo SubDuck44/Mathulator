@@ -17,23 +17,25 @@ typedef enum {
 } TokenTypes;
 
 // Stores recognized variable identifiers and their definition in string form
-typedef struct {
-	TokenTypes type;
-	char*      key;
-	size_t     key_len;
-	size_t     children;
-	size_t     num_children;
-} Symbol;
+ArrayN(struct Symbol*, Symbols);
+ArrayN(struct Symbol, SymbolStorage);
 
-Array(Symbol);
+struct Symbol {
+	TokenTypes  type;
+	size_t      key_len;
+	const char* key;
+	Symbols     children;
+};
 
 /* Working storage of all symbols. Functions as a definition tree which holds
    the expansion of all variables. Is used for Step 1 - 3 of recursive
    evaluation. */
-extern Symbols symbols;
+extern struct Symbol symbols_root;
+extern SymbolStorage symbols_store;
 
 #if __INCLUDE_LEVEL__ == 0 /////////////////////////////////////////////////////
 
-Symbols symbols = {0};
+struct Symbol symbols_root  = {0};
+SymbolStorage symbols_store = {0};
 
 #endif

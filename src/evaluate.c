@@ -8,9 +8,16 @@
 
 #include "tree.c"
 
+/* Asks for user input returns the resulting string. To be passed to
+   parse_string(), which then initiates the recursive evaluation. Optionally
+   pass a pointer to the symbol to be defined, if its "NULL", the prompt will
+   simply be empty.
+   -> Step 1 of recursive evaluation */
+StringView ask_for_definition(const struct Symbol* target);
+
 /* Splits an input string from the user into tokens and recursively prompts to
-   define them -> Step 1 of rescursive evaluation */
-void parse_string(const char* target, size_t target_len, const size_t parent);
+   define them -> Step 2 of rescursive evaluation */
+void parse_string(StringView string, struct Symbol* parent);
 
 #if __INCLUDE_LEVEL__ == 0 /////////////////////////////////////////////////////
 
@@ -20,20 +27,20 @@ static char* id_blacklist[] = {"sqrt", "pow",  "log",  "sin",  "cos",  "tan",
 
 /* Takes a string and its length and returns PROSE if the string is part of the
    symbol blacklist, else returns IDENT */
-TokenTypes check_for_blacklisted(const char* target, size_t target_len) {
+static TokenTypes check_if_blacklisted(StringView token) {
 	// Skip target identifier if it's blacklistedi
 	size_t num_blacklisted_ids = sizeof(id_blacklist) / sizeof(id_blacklist[0]);
 
 	for(size_t iter = 0; iter < num_blacklisted_ids; iter++) {
 
 		// Avoid matching shorter substrings of keywords
-		if(strlen(id_blacklist[iter]) != target_len) continue;
+		if(strlen(id_blacklist[iter]) != token.len) continue;
 
-		if(strncmp(id_blacklist[iter], target, target_len) == 0) {
+		if(strncmp(id_blacklist[iter], token.str, token.len) == 0) {
 
 			fprintf(
 				stderr, "Ignored blacklisted identifier %.*s\n",
-				(int) target_len, target
+				(int) token.len, token.str
 			);
 
 			return PROSE;
@@ -43,25 +50,74 @@ TokenTypes check_for_blacklisted(const char* target, size_t target_len) {
 	return IDENT;
 }
 
-void parse_string(const char* target, size_t target_len, const size_t parent) {
-	assert(symbols.ptr[0].key == NULL && "Index 0 is not root");
-	assert(parent == symbols.len - 1 && "Parent is not last element in tree");
-	assert(parent <= 0 && parent < symbols.len && "Parent index out of range");
+/* Filters a newly found token into the symbol tree, takes the "new_symbol"
+   itself and a reference to its "parent"
+   -> Step 3 of recursive evaluation, loops back to Step 1*/
+static void store_symbol(struct Symbol new_symbol, struct Symbol* parent) {
+#define PERSIST_SYM &ArrayLast(symbols_store)
 
-#define STORE_MATCHED(prose_or_ident)                                          \
+	switch(new_symbol.type) {
+	case IDENT:
+		// Abort if symbol is duplicate with another id
+		ArrayLoop(
+			symbols_store,
+			if(new_symbol.key_len == it->key_len &&                       //
+		       strncmp(new_symbol.key, it->key, new_symbol.key_len) == 0) //
+			return;
+		);
+
+		// Make symbol persistent
+		ArrayAdd(symbols_store, new_symbol);
+
+		parse_string(ask_for_definition(&new_symbol), PERSIST_SYM);
+
+		// Append persistent symbol to tree
+		ArrayAdd(parent->children, PERSIST_SYM);
+		break;
+
+	case PROSE:
+
+		// Make symbol persistent
+		ArrayAdd(symbols_store, new_symbol);
+
+		// Append persistent symbol to tree
+		ArrayAdd(parent->children, PERSIST_SYM);
+		break;
+
+	default:
+		return;
+	}
+}
+
+StringView ask_for_definition(const struct Symbol* target) {
+	if(target == NULL) {
+		fputs("Mathulator\n➔  ", stderr);
+	} else {
+		fprintf(stderr, "Define %.*s\n➔  ", (int) target->key_len, target->key);
+	}
+
+	UserInput input = {0};
+	get_user_input(&input);
+
+	return (StringView) {strndup(input.ptr, input.len), input.len};
+}
+
+void parse_string(StringView string, struct Symbol* parent) {
+
+#define MATCH_PTR &string.str[match_start]
+#define MATCH_LEN match_end - match_start + 1
+
+// Integrates newly found symbols into the symbol tree
+#define STORE_SYMBOL(ident_or_prose)                                           \
 	do {                                                                       \
-		size_t match_len = match_end - match_start + 1;                        \
-                                                                               \
-		Symbol matched_symbol = {                                              \
-			.key     = strndup(&target[iter], match_len),                      \
-			.key_len = match_len,                                              \
+		/* Pack new symbol */                                                  \
+		struct Symbol new_sym = {                                              \
+			.type    = (ident_or_prose),                                       \
+			.key     = MATCH_PTR,                                              \
+			.key_len = MATCH_LEN,                                              \
 		};                                                                     \
-		matched_symbol.type =                                                  \
-			check_for_blacklisted(matched_symbol.key, matched_symbol.key_len); \
                                                                                \
-		if(!matched_symbol.key) err(1, "strndup failure, aborting...");        \
-                                                                               \
-		ArrayAdd(symbols, matched_symbol);                                     \
+		store_symbol(new_sym, parent);                                         \
 	} while(0)
 
 // Evaluates to true if 'c' is a valid char for an identifier
@@ -73,11 +129,9 @@ void parse_string(const char* target, size_t target_len, const size_t parent) {
 
 	TokenTypes is_matching = NONE;
 
-	size_t num_matches = 0;
-
 	// Scan for tokens
-	for(size_t iter = 0; iter < target_len; iter++) {
-		char c = target[iter];
+	for(size_t iter = 0; iter < string.len; iter++) {
+		char c = string.str[iter];
 
 		if(IS_IDENT(c)) {
 			fprintf(stderr, "Found identifier char %c\n", c);
@@ -97,11 +151,10 @@ void parse_string(const char* target, size_t target_len, const size_t parent) {
 			case PROSE:
 				// Reached end of prose match, store value
 				fprintf(
-					stderr, "Terminated %.*s with %c\n",
-					(int) (match_end - match_start + 1), &target[match_start], c
+					stderr, "Terminated %.*s with %c\n", (int) (MATCH_LEN),
+					MATCH_PTR, c
 				);
-				STORE_MATCHED(PROSE);
-				num_matches++;
+				STORE_SYMBOL(PROSE);
 
 				match_start = iter;
 				match_end   = iter;
@@ -121,11 +174,11 @@ void parse_string(const char* target, size_t target_len, const size_t parent) {
 			case IDENT:
 				// Reached end of identifier match, store value
 				fprintf(
-					stderr, "Terminated %.*s with %c\n",
-					(int) (match_end - match_start + 1), &target[match_start], c
+					stderr, "Terminated %.*s with %c\n", (int) (MATCH_LEN),
+					MATCH_PTR, c
 				);
-				STORE_MATCHED(IDENT);
-				num_matches++;
+				STORE_SYMBOL(check_if_blacklisted((StringView) {MATCH_PTR,
+				                                                MATCH_LEN}));
 
 				match_start = iter;
 				match_end   = iter;
@@ -139,29 +192,6 @@ void parse_string(const char* target, size_t target_len, const size_t parent) {
 			}
 		}
 	}
-
-	// Assign all matches as children of designated parent node in tree
-	symbols.ptr[parent].children     = symbols.len - num_matches;
-	symbols.ptr[parent].num_children = num_matches;
-
-	assert(
-		symbols.ptr[parent].children + symbols.ptr[parent].num_children ==
-			symbols.len &&
-		"Assigned incorrect children range to parent"
-	);
-
-	// Repeat procedure for all matched tokens
-	UserInput input = {0};
-
-	for(size_t iter = parent + 1; iter < symbols.len; iter++) {
-		if(symbols.ptr[iter].type != IDENT) continue;
-
-		get_user_input(&input);
-		fprintf(stderr, "Define %.*s\n➔  ", (int) input.len, input.ptr);
-		parse_string(input.ptr, input.len, iter);
-	}
-
-	ArrayFree(input);
 }
 
 #endif

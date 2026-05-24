@@ -1,23 +1,14 @@
 
 #include <err.h>
-#include <stdio.h>
 
 #include "evaluate.c"
 
 int main(void) {
-	// Init symbol tree
-	Symbol root = {0};
-	ArrayAdd(symbols, root);
+	struct Symbol tree_root = {0};
 
-	fputs("Mathulator\n➔  ", stderr);
-	UserInput input = {0};
-	get_user_input(&input);
-
-	// CONTINUE if received input
-
-	input.ptr[input.len - 1] = 0; // Clear newline
-
-	parse_string(
-		input.ptr, (size_t) input.len, TREE_ROOT
-	); // Enter recursive evaluation phase
+	while(true) {
+		parse_string(
+			ask_for_definition(&tree_root), &tree_root
+		); // Enter recursive evaluation phase
+	}
 }
