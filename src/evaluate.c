@@ -61,8 +61,9 @@ static void store_symbol(struct Symbol new_symbol, struct Symbol* parent) {
 		// Abort if symbol is duplicate with another id
 		ArrayLoop(
 			symbols_store,
-			if(new_symbol.key_len == it->key_len &&                       //
-		       strncmp(new_symbol.key, it->key, new_symbol.key_len) == 0) //
+			if(new_symbol.key.len == it->key.len && //
+		       strncmp(new_symbol.key.str, it->key.str, new_symbol.key.len) ==
+		           0) //
 			return;
 		);
 
@@ -90,10 +91,12 @@ static void store_symbol(struct Symbol new_symbol, struct Symbol* parent) {
 }
 
 StringView ask_for_definition(const struct Symbol* target) {
-	if(target == NULL) {
+	if(target->key.str == NULL) {
 		fputs("Mathulator\n➔  ", stderr);
 	} else {
-		fprintf(stderr, "Define %.*s\n➔  ", (int) target->key_len, target->key);
+		fprintf(
+			stderr, "Define %.*s\n➔  ", (int) target->key.len, target->key.str
+		);
 	}
 
 	UserInput input = {0};
@@ -112,9 +115,8 @@ void parse_string(StringView string, struct Symbol* parent) {
 	do {                                                                       \
 		/* Pack new symbol */                                                  \
 		struct Symbol new_sym = {                                              \
-			.type    = (ident_or_prose),                                       \
-			.key     = MATCH_PTR,                                              \
-			.key_len = MATCH_LEN,                                              \
+			.type = (ident_or_prose),                                          \
+			.key  = (StringView) {MATCH_PTR, MATCH_LEN},                       \
 		};                                                                     \
                                                                                \
 		store_symbol(new_sym, parent);                                         \

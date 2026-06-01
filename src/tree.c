@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdlib.h>
-
 #include "utils.c"
 
 #define TREE_ROOT 0
@@ -21,10 +19,9 @@ ArrayN(struct Symbol*, Symbols);
 ArrayN(struct Symbol, SymbolStorage);
 
 struct Symbol {
-	TokenTypes  type;
-	size_t      key_len;
-	const char* key;
-	Symbols     children;
+	TokenTypes type;
+	StringView key;
+	Symbols    children;
 };
 
 /* Working storage of all symbols. Functions as a definition tree which holds
