@@ -1,6 +1,7 @@
 
 #include <err.h>
 
+#include "apply.c"
 #include "evaluate.c"
 
 int main(void) {
@@ -8,5 +9,7 @@ int main(void) {
 		parse_string(
 			ask_for_definition(&symbols_root), &symbols_root
 		); // Enter recursive evaluation phase
+
+		print_results();
 	}
 }

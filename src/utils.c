@@ -76,11 +76,11 @@ typedef struct {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#define MIN(a, b) ((a) < (b)) ? a : b
+#define MIN(a, b) (((a) < (b)) ? a : b)
 
-#define MAX(a, b) ((a) > (b)) ? a : b
+#define MAX(a, b) (((a) > (b)) ? a : b)
 
-#define CLAMP(min, max, val) MIN(MAX((min), (val)), (max))
+#define CLAMP(min, max, val) (MIN(MAX((min), (val)), (max)))
 
 ////////////////////////////////////////////////////////////////////////////////
 

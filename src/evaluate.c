@@ -70,8 +70,6 @@ static void store_symbol(struct Symbol new_symbol, struct Symbol* parent) {
 		// Make symbol persistent
 		ArrayAdd(symbols_store, new_symbol);
 
-		parse_string(ask_for_definition(&new_symbol), PERSIST_SYM);
-
 		// Append persistent symbol to tree
 		ArrayAdd(parent->children, PERSIST_SYM);
 		break;
@@ -163,6 +161,11 @@ void parse_string(StringView string, struct Symbol* parent) {
 				is_matching = IDENT;
 				break;
 			}
+		} else if(c == '\n') {
+			// reached end of string, store last symbol
+			STORE_SYMBOL(is_matching);
+
+			break;
 		} else {
 			fprintf(stderr, "Found prose char %c\n", c);
 			switch(is_matching) {
@@ -192,6 +195,15 @@ void parse_string(StringView string, struct Symbol* parent) {
 				match_end = iter;
 				break;
 			}
+		}
+	}
+
+	// define and parse all remaining undefined identifiers
+	for(size_t i = 0; i < symbols_store.len; i++) {
+		struct Symbol* sym = &symbols_store.ptr[i];
+
+		if(sym->type == IDENT && sym->children.len == 0) {
+			parse_string(ask_for_definition(sym), sym);
 		}
 	}
 }

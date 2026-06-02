@@ -11,6 +11,7 @@ project(
 executable(
 	'mathulator',
 	'src/evaluate.c',
+	'src/apply.c',
 	'src/main.c',
 	'src/tree.c',
 	'src/utils.c',
