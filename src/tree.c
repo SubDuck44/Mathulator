@@ -2,8 +2,6 @@
 
 #include "utils.c"
 
-#define TREE_ROOT 0
-
 ////////////////////////////////////////////////////////////////////////////////
 
 /* A symbol will be IDENT if it represents a variable, or PROSE if it should be

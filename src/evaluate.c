@@ -58,14 +58,18 @@ static void store_symbol(struct Symbol new_symbol, struct Symbol* parent) {
 
 	switch(new_symbol.type) {
 	case IDENT:
-		// Abort if symbol is duplicate with another id
-		ArrayLoop(
-			symbols_store,
-			if(new_symbol.key.len == it->key.len && //
-		       strncmp(new_symbol.key.str, it->key.str, new_symbol.key.len) ==
-		           0) //
-			return;
-		);
+		// Abort if symbol is duplicate
+		for(size_t i = 0; i < symbols_store.len; i++) {
+			struct Symbol* iter = &symbols_store.ptr[i];
+
+			if(new_symbol.key.len == iter->key.len && //
+			   strncmp(new_symbol.key.str, iter->key.str, new_symbol.key.len) ==
+			       0) {
+
+				ArrayAdd(parent->children, iter);
+				return;
+			}
+		}
 
 		// Make symbol persistent
 		ArrayAdd(symbols_store, new_symbol);
